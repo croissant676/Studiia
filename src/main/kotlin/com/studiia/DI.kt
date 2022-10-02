@@ -9,7 +9,6 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.coroutine.CoroutineDatabase
 
 abstract class Controller : DIAware {
-	val application: Application by instance()
 	abstract fun Route.registerRoutes()
 	internal class RouterConsumer internal constructor(private val application: Application) :
 		(DI, DI.Key<*, *, *>, List<DIDefinition<*, *, *>>) -> Unit {

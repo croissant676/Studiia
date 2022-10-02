@@ -2,6 +2,7 @@ package com.studiia.user
 
 import com.studiia.Hexa
 import com.studiia.ModuleProducer
+import com.studiia.encode
 import com.studiia.getCollection
 import com.typesafe.config.Config
 import kotlinx.datetime.Clock
@@ -16,7 +17,7 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 import kotlin.time.Duration.Companion.days
 
 @Serializable
-class User(
+data class User(
 	@SerialName("_id")
 	val id: Hexa,
 	var email: String,
@@ -87,21 +88,55 @@ class User(
 		createdAt = createdAt,
 	)
 
+	// don't expose password
+	@Serializable
+	data class CompleteResponse(
+		val id: Hexa,
+		val username: String,
+		val profilePicture: String?,
+		val topLevelSets: Set<Hexa>,
+		val folders: Set<Hexa>,
+		val email: String,
+		val firstName: String,
+		val middleName: String?,
+		val lastName: String,
+		val birthday: LocalDate,
+		val createdAt: Instant,
+		val verified: Boolean,
+		val privateMode: Boolean
+	)
+
+	fun toCompleteResponse() = CompleteResponse(
+		id = id,
+		username = username,
+		profilePicture = profilePicture,
+		topLevelSets = topLevelSets,
+		folders = folders,
+		email = email,
+		firstName = firstName,
+		middleName = middleName,
+		lastName = lastName,
+		birthday = birthday,
+		createdAt = createdAt,
+		verified = verified,
+		privateMode = privateMode
+	)
+
 	@Serializable
 	data class Signup(
 		val email: String,
 		val username: String,
 		val password: String,
 		val firstName: String,
-		val middleName: String?,
+		val middleName: String? = null,
 		val lastName: String,
 		val birthday: LocalDate
 	) {
-		fun toUser(hexa: Hexa) = User(
+		suspend fun toUser(hexa: Hexa) = User(
 			id = hexa,
 			email = email,
 			username = username,
-			password = password,
+			password = password.encode(),
 			firstName = firstName,
 			middleName = middleName,
 			lastName = lastName,
@@ -116,7 +151,7 @@ class User(
 	}
 
 	@Serializable
-	class Verification(
+	data class Verification(
 		@SerialName("_id")
 		val token: String,
 		val email: String,
@@ -129,6 +164,67 @@ class User(
 		email = email,
 		expirationTimestamp = Clock.System.now() + VerificationDuration,
 		user = id,
+	)
+
+	@Serializable
+	data class PatchUpdate(
+		var email: String? = null,
+		var username: String? = null,
+		var password: String? = null,
+		var firstName: String? = null,
+		var middleName: String? = null,
+		var lastName: String? = null,
+		var birthday: LocalDate? = null,
+		var profilePicture: String? = null,
+	)
+
+	suspend fun applyPatch(patchUpdate: PatchUpdate) {
+		patchUpdate.email?.let { email = it }
+		patchUpdate.username?.let { username = it }
+		patchUpdate.password?.let { password = it.encode() }
+		patchUpdate.firstName?.let { firstName = it }
+		patchUpdate.middleName?.let { middleName = it }
+		patchUpdate.lastName?.let { lastName = it }
+		patchUpdate.birthday?.let { birthday = it }
+		patchUpdate.profilePicture?.let { profilePicture = it }
+	}
+
+	@Serializable
+	data class PutUpdate(
+		var email: String,
+		var username: String,
+		var password: String,
+		var firstName: String,
+		var middleName: String?,
+		var lastName: String,
+		var birthday: LocalDate,
+		var profilePicture: String?
+	)
+
+	suspend fun applyPut(putUpdate: PutUpdate) {
+		email = putUpdate.email
+		username = putUpdate.username
+		password = putUpdate.password.encode()
+		firstName = putUpdate.firstName
+		middleName = putUpdate.middleName
+		lastName = putUpdate.lastName
+		birthday = putUpdate.birthday
+		profilePicture = putUpdate.profilePicture
+	}
+
+	@Serializable
+	data class DeleteResponse(
+		val id: Hexa,
+		val username: String,
+		val deletedSets: Set<Hexa>,
+		val deletedFolders: Set<Hexa>
+	)
+
+	fun toDeleteResponse() = DeleteResponse(
+		id = id,
+		username = username,
+		deletedSets = topLevelSets,
+		deletedFolders = folders
 	)
 
 }

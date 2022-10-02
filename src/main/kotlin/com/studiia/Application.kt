@@ -19,8 +19,12 @@ import io.ktor.server.plugins.doublereceive.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import io.ktor.util.*
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import mu.KotlinLogging
 import net.axay.simplekotlinmail.delivery.MailerManager
 import net.axay.simplekotlinmail.delivery.mailerBuilder
@@ -34,7 +38,18 @@ import org.litote.kmongo.reactivestreams.KMongo
 import org.simplejavamail.api.email.EmailPopulatingBuilder
 import org.slf4j.event.Level
 
-val logger = KotlinLogging.logger {}
+val jsonFormat = Json {
+	ignoreUnknownKeys = true
+	isLenient = true
+	encodeDefaults = true
+	serializersModule = SerializersModule {
+		contextual(DurationSerializer)
+	}
+	allowSpecialFloatingPointValues = true
+	allowStructuredMapKeys = true
+	prettyPrint = false
+	useArrayPolymorphism = false
+}
 
 fun main() {
 	val config = loadConfig()
@@ -44,6 +59,7 @@ fun main() {
 			Controller.RouterConsumer(this@embeddedServer)
 		)
 		installPlugins()
+		registerMailer(config)
 	}.start(wait = true)
 }
 
@@ -79,7 +95,7 @@ fun DI.indexBeans(vararg consumers: DITreeConsumer = arrayOf()): List<DITreeCons
 
 fun Application.installPlugins() {
 	install(ContentNegotiation) {
-		json()
+		json(jsonFormat)
 	}
 	install(CallLogging) {
 		level = Level.INFO
@@ -97,6 +113,7 @@ fun Application.installPlugins() {
 			call.respondException(cause)
 		}
 	}
+	install(IgnoreTrailingSlash)
 }
 
 open class StatusException(val status: HttpStatusCode, message: String) : Exception(message)

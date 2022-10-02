@@ -54,6 +54,9 @@ dependencies {
     implementation("org.kodein.di:kodein-di:7.14.0")
     implementation("io.kotest:kotest-runner-junit5:5.4.2")
     implementation("io.kotest:kotest-assertions-core:5.4.2")
+    implementation("org.springframework.security:spring-security-crypto:5.7.3")
+    implementation("org.slf4j:jcl-over-slf4j:2.0.1")
+    implementation("org.bouncycastle:bcprov-jdk15on:1.70")
     testImplementation("io.ktor:ktor-server-tests-jvm:2.1.2")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.7.20")
 }
