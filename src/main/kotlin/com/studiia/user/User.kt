@@ -5,6 +5,7 @@ import com.studiia.ModuleProducer
 import com.studiia.encode
 import com.studiia.getCollection
 import com.typesafe.config.Config
+import io.ktor.server.auth.*
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -33,7 +34,7 @@ data class User(
 	var folders: MutableSet<Hexa>,
 	var verified: Boolean,
 	var privateMode: Boolean,
-) {
+): Principal {
 	companion object : ModuleProducer {
 		val VerificationDuration = 1.days
 		override fun produceModule(config: Config): DI.Module = DI.Module("user") {
@@ -168,14 +169,14 @@ data class User(
 
 	@Serializable
 	data class PatchUpdate(
-		var email: String? = null,
-		var username: String? = null,
-		var password: String? = null,
-		var firstName: String? = null,
-		var middleName: String? = null,
-		var lastName: String? = null,
-		var birthday: LocalDate? = null,
-		var profilePicture: String? = null,
+		val email: String? = null,
+		val username: String? = null,
+		val password: String? = null,
+		val firstName: String? = null,
+		val middleName: String? = null,
+		val lastName: String? = null,
+		val birthday: LocalDate? = null,
+		val profilePicture: String? = null,
 	)
 
 	suspend fun applyPatch(patchUpdate: PatchUpdate) {
@@ -191,14 +192,14 @@ data class User(
 
 	@Serializable
 	data class PutUpdate(
-		var email: String,
-		var username: String,
-		var password: String,
-		var firstName: String,
-		var middleName: String?,
-		var lastName: String,
-		var birthday: LocalDate,
-		var profilePicture: String?
+		val email: String,
+		val username: String,
+		val password: String,
+		val firstName: String,
+		val middleName: String?,
+		val lastName: String,
+		val birthday: LocalDate,
+		val profilePicture: String?
 	)
 
 	suspend fun applyPut(putUpdate: PutUpdate) {

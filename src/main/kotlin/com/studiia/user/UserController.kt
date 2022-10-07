@@ -12,7 +12,7 @@ import org.kodein.di.*
 class UserController(override val di: DI) : Controller() {
 	private val service: UserService by instance()
 	override fun Route.registerRoutes() {
-		route("/users") {
+		route("/api/users") {
 			route("/{id}") {
 				get {
 					val id = call.id()
@@ -42,7 +42,8 @@ class UserController(override val di: DI) : Controller() {
 			route("/{token}") {
 				get {
 					val token = call.parameters["token"] ?: throw MissingRequestParameterException("token")
-					call.respond(service.finishVerification(token))
+					service.finishVerification(token)
+					call.respondRedirect("/dashboard")
 				}
 			}
 		}

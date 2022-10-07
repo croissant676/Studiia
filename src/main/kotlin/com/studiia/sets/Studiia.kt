@@ -20,7 +20,7 @@ data class Studiia(
 	var name: String,
 	var description: String,
 	var createdAt: Instant,
-	var creator: Hexa,
+	var owner: Hexa,
 	var folder: Hexa?,
 	val cards: MutableList<Flashcard>,
 	val userData: MutableSet<UserData>,
@@ -29,9 +29,34 @@ data class Studiia(
 	companion object : ModuleProducer {
 		override fun produceModule(config: Config): DI.Module = DI.Module("Studiia") {
 			bind<StudiiaService>() with singleton { StudiiaService(di) }
-
+			bind<StudiiaController>() with singleton { StudiiaController(di) }
 		}
+	}
 
+	@Serializable
+	data class PatchUpdate(
+		val name: String? = null,
+		val description: String? = null,
+		val folder: Hexa? = null
+	) {
+		fun apply(studiia: Studiia) {
+			name?.let { studiia.name = it }
+			description?.let { studiia.description = it }
+			folder?.let { studiia.folder = it }
+		}
+	}
+
+	@Serializable
+	data class PutUpdate(
+		val name: String,
+		val description: String,
+		val folder: Hexa?
+	) {
+		fun apply(studiia: Studiia) {
+			studiia.name = name
+			studiia.description = description
+			studiia.folder = folder
+		}
 	}
 
 	@Serializable
@@ -48,6 +73,28 @@ data class Studiia(
 		) {
 			fun toFlashcard(index: Int) = Flashcard(index, frontText, backText, mutableListOf())
 		}
+
+		@Serializable
+		data class PatchUpdate(
+			var frontText: String? = null,
+			var backText: String? = null,
+		) {
+			fun update(flashcard: Flashcard) {
+				frontText?.let { flashcard.frontText = it }
+				backText?.let { flashcard.backText = it }
+			}
+		}
+
+		@Serializable
+		data class PutUpdate(
+			var frontText: String,
+			var backText: String,
+		) {
+			fun update(flashcard: Flashcard) {
+				flashcard.frontText = frontText
+				flashcard.backText = backText
+			}
+		}
 	}
 
 	@Serializable
@@ -55,7 +102,8 @@ data class Studiia(
 		val user: Hexa,
 		var review: Review?,
 		val testResults: MutableList<TestResult>,
-		var matchingPersonalBest: Double
+		var matchingPersonalBest: Double?,
+		var stage: Stage,
 	) {
 		@Serializable
 		data class Review(
@@ -80,26 +128,31 @@ data class Studiia(
 
 		@Serializable
 		sealed class QuestionResult {
-			abstract val card: Int
 			abstract val timestamp: Instant
-			abstract val approximateAnswerTime: Duration
+			abstract val approximateAnswerTime: Duration?
 			abstract val correct: Boolean
+
+			val multipleChoiceCardResult: MultipleChoiceCardResult?
+				get() = this as? MultipleChoiceCardResult
+			val openEndedCardResult: OpenAnswerCardResult?
+				get() = this as? OpenAnswerCardResult
+			val matchingCardResult: MatchingCardResult?
+				get() = this as? MatchingCardResult
 
 			@Serializable
 			sealed class Create {
-				abstract val card: Int
-				abstract val approximateAnswerTime: Duration
+				abstract val approximateAnswerTime: Duration?
 			}
 		}
 
 		@SerialName("multiple_choice")
 		@Serializable
 		data class MultipleChoiceCardResult(
-			override val card: Int,
 			override val timestamp: Instant,
 			@Contextual
-			override val approximateAnswerTime: Duration,
+			override val approximateAnswerTime: Duration?,
 			override val correct: Boolean,
+			val card: Int,
 			val question: String,
 			val answer: Int,
 			val possibleAnswers: List<String>,
@@ -107,9 +160,9 @@ data class Studiia(
 			@SerialName("multiple_choice")
 			@Serializable
 			data class Create(
-				override val card: Int,
 				@Contextual
-				override val approximateAnswerTime: Duration,
+				override val approximateAnswerTime: Duration?,
+				val card: Int,
 				val question: String,
 				val answer: Int,
 				val possibleAnswers: List<String>,
@@ -119,11 +172,11 @@ data class Studiia(
 		@SerialName("open_answer")
 		@Serializable
 		data class OpenAnswerCardResult(
-			override val card: Int,
 			override val timestamp: Instant,
 			@Contextual
 			override val approximateAnswerTime: Duration,
 			override val correct: Boolean,
+			val card: Int,
 			val question: String,
 			val answer: String,
 			val expectedAnswer: String,
@@ -132,9 +185,9 @@ data class Studiia(
 			@SerialName("open_answer")
 			@Serializable
 			data class Create(
-				override val card: Int,
 				@Contextual
 				override val approximateAnswerTime: Duration,
+				val card: Int,
 				val question: String,
 				val answer: String
 			) : QuestionResult.Create()
@@ -144,24 +197,22 @@ data class Studiia(
 		@Serializable
 		@SerialName("matching")
 		data class MatchingCardResult(
-			override val card: Int = -1, // card # is not relevant for matching
 			override val timestamp: Instant,
 			@Contextual
 			override val approximateAnswerTime: Duration,
 			override val correct: Boolean,
 			val leftAnswers: List<String>,
 			val rightAnswers: List<String>,
-			val correctMatching: Map<Int, Int>,
-			val userMatching: Map<Int, Int>,
+			val correctMatching: Map<Char, Char>,
+			val userMatching: Map<Char, Char>,
 			val cards: List<Int>,
 		) : QuestionResult() {
 
 			@Serializable
 			@SerialName("matching")
 			data class Create(
-				override val card: Int = -1,
 				@Contextual
-				override val approximateAnswerTime: Duration,
+				override val approximateAnswerTime: Duration?,
 				val leftAnswers: List<String>,
 				val rightAnswers: List<String>,
 				val userMatching: Map<Int, Int>,
@@ -174,19 +225,42 @@ data class Studiia(
 		data class TestResult(
 			val id: Hexa,
 			@Contextual
-			val duration: Duration,
+			val duration: Duration?,
 			val timeStart: Instant,
 			val timeStop: Instant,
 			val results: List<QuestionResult>,
 			val accuracy: Double
+		) {
+
+			@Serializable
+			data class Create(
+				val timeStart: Instant,
+				val timeStop: Instant,
+				val results: List<QuestionResult.Create>
+			)
+		}
+
+		@Serializable
+		data class OwnerCopy(
+			val user: Hexa,
+			val review: Review?,
+			val stage: Stage,
+			val matchingPersonalBest: Double?
+		)
+
+		fun toOwnerCopy() = OwnerCopy(
+			user = user,
+			review = review,
+			stage = stage,
+			matchingPersonalBest = matchingPersonalBest
 		)
 
 		@Serializable
-		data class TestResultCreate(
-			val timeStart: Instant,
-			val timeStop: Instant,
-			val results: List<QuestionResult>
-		)
+		enum class Stage {
+			Learning,
+			Reviewing,
+			Mastered;
+		}
 	}
 
 	@Serializable
@@ -207,7 +281,7 @@ data class Studiia(
 			name = name,
 			description = description,
 			createdAt = createdAt,
-			creator = creator,
+			creator = owner,
 			folder = folder,
 			cards = cards,
 			averageReviews = averageReviews
@@ -215,7 +289,34 @@ data class Studiia(
 	}
 
 	@Serializable
-	data class Creation(
+	data class OwnerResponse(
+		val id: Hexa,
+		val name: String,
+		val description: String,
+		val createdAt: Instant,
+		val creator: Hexa,
+		val folder: Hexa?,
+		val cards: List<Flashcard>,
+		val reviews: List<UserData.Review>,
+		val users: List<Hexa>
+	)
+
+	fun toOwnerResponse(reviews: List<UserData.Review>, users: List<Hexa>): OwnerResponse {
+		return OwnerResponse(
+			id = id,
+			name = name,
+			description = description,
+			createdAt = createdAt,
+			creator = owner,
+			folder = folder,
+			cards = cards,
+			reviews = reviews,
+			users = users
+		)
+	}
+
+	@Serializable
+	data class Create(
 		val id: Hexa,
 		val name: String,
 		val description: String,
@@ -226,7 +327,7 @@ data class Studiia(
 			name = name,
 			description = description,
 			createdAt = Clock.System.now(),
-			creator = creator,
+			owner = creator,
 			folder = folder,
 			cards = mutableListOf(),
 			userData = mutableSetOf(),
