@@ -48,8 +48,19 @@ class StudiiaService(override val di: DI) : DIAware {
 	fun ownerResponse(studiia: Studiia): Studiia.OwnerResponse =
 		studiia.toOwnerResponse(getReviews(studiia), studiia.userData.map { it.user })
 
-	suspend fun addReview(id: Hexa, user: Hexa, review: Studiia.UserData.Review.Create): Any {
+	fun nonOwnerResponse(studiia: Studiia): Studiia.NonOwnerResponse {
+		val averageReviews = getReviews(studiia).map { it.rating }.average()
+		return studiia.toNonOwnerResponse(averageReviews)
+	}
 
+	suspend fun addReview(id: Hexa, userId: Hexa, review: Studiia.UserData.Review.Create): Any {
+		val studiia = find(id)
+		val user = userService.find(userId)
+		val userData = studiia.userData.find { it.user == userId }
+			?: error("User with id $userId is not a member of studiia with id $id")
+		userData.review = review.toReview(userId)
+		studiias.updateOneById(id, studiia)
+		return nonOwnerResponse(studiia)
 	}
 
 }
